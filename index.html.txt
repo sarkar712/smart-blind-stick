@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Smart Blind Stick</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+<style>
+body {
+font-family: sans-serif;
+text-align: center;
+background-color: #f5f5f5;
+margin: 0;
+padding: 20px;
+}
+video {
+width: 100%;
+max-width: 400px;
+border: 4px solid #333;
+border-radius: 10px;
+}
+#label {
+font-size: 1.2em;
+margin-top: 10px;
+color: #333;
+}
+</style>
+</head>
+<body>
+<h2>Smart Blind Stick</h2>
+<video id="video" autoplay muted playsinline></video>
+<p id="label">Initializing...</p>
+
+<script>
+const video = document.getElementById("video");
+const label = document.getElementById("label");
+let lastObject = "";
+
+// Start camera with back lens
+async function startCamera() {
+try {
+const stream = await navigator.mediaDevices.getUserMedia({
+video: { facingMode: { exact: "environment" } }, // Use back camera
+audio: false
+});
+video.srcObject = stream;
+} catch (err) {
+console.error("Camera error:", err);
+alert("Could not access back camera. Try another browser or check permission.");
+}
+}
+
+// Speak object
+function speak(text) {
+const msg = new SpeechSynthesisUtterance(`I see a ${text}`);
+msg.lang = "en-IN"; // Use your preferred voice/language here
+window.speechSynthesis.speak(msg);
+}
+
+// Send object to NodeMCU (optional)
+function sendToNodeMCU(object) {
+fetch(`http://192.168.4.1/detect?object=${object}`)
+.then(response => console.log("Sent to NodeMCU:", object))
+.catch(err => console.error("Error sending to NodeMCU:", err));
+}
+
+// Load model and detect objects
+async function loadModelAndDetect() {
+const model = await cocoSsd.load();
+setInterval(async () => {
+const predictions = await model.detect(video);
+if (predictions.length > 0) {
+const object = predictions[0].class;
+if (object !== lastObject) {
+lastObject = object;
+label.innerText = `Detected: ${object}`;
+speak(object);
+sendToNodeMCU(object);
+}
+}
+}, 3000);
+}
+
+// Initialize
+startCamera().then(loadModelAndDetect);
+</script>
+</body>
+</html>
