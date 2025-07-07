@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Smart Blind Stick</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+</head>
+<body>
+<h3>Smart Blind Stick (Phone Camera)</h3>
+<video id="video" width="300" height="200" autoplay muted></video>
+<p id="label">Detecting...</p>
+
+<script>
+const video = document.getElementById("video");
+const label = document.getElementById("label");
+let lastObject = "";
+
+async function startCamera() {
+const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+video.srcObject = stream;
+}
+
+async function loadModelAndDetect() {
+const model = await cocoSsd.load();
+setInterval(async () => {
+const predictions = await model.detect(video);
+if (predictions.length > 0) {
+const object = predictions[0].class;
+if (object !== lastObject) {
+lastObject = object;
+label.innerText = `Detected: ${object}`;
+speak(object);
+sendToNodeMCU(object);
+}
+}
+}, 3000);
+}
+
+function speak(text) {
+const msg = new SpeechSynthesisUtterance(`I see a ${text}`);
+speechSynthesis.speak(msg);
+}
+
+function sendToNodeMCU(obj) {
+fetch(`http://192.168.4.1/detect?object=${obj}`)
+.then(res => console.log("Sent to NodeMCU:", obj))
+.catch(err => console.error("Error:", err));
+}
+
+startCamera().then(loadModelAndDetect);
+</script>
+</body>
+</html>
